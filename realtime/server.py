@@ -102,11 +102,20 @@ def tu_json():
 
 @app.route("/healthz")
 def healthz():
+    """Liveness pro Railway: proces běží a odpovídá (nezávisle na zdrojovém API)."""
+    return jsonify({"alive": True})
+
+
+@app.route("/status")
+def status():
+    """Stav dat: 200 = feed čerstvý, 503 = data stará nebo chyba zdroje."""
     with _lock:
         age = time.time() - _state["last_poll_at"] if _state["last_poll_at"] else None
         err = _state["error"]
+        stats = _state["stats"]
     ok = age is not None and age < POLL_INTERVAL * 3 and err is None
-    return jsonify({"ok": ok, "age_s": age, "error": err}), (200 if ok else 503)
+    return (jsonify({"ok": ok, "age_s": age, "error": err, "stats": stats,
+                     "siri_vm_configured": bool(SIRI_VM_URL)}), 200 if ok else 503)
 
 
 @app.route("/")

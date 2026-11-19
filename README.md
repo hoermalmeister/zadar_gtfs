@@ -35,9 +35,12 @@ Days without a suitable snapshot (e.g. the first weekend after setup) have no se
 
 ### GTFS-RT on Railway
 
-1. Railway → **New Project → Deploy from GitHub repo** → `zadar_gtfs` (start command and health check are in `railway.json`).
-2. **Variables**: `ZADAR_API_KEY`, `SIRI_VM_URL` (realtime vehicle monitoring endpoint), optionally `POLL_INTERVAL` (default 20 s).
-3. **Settings → Networking → Generate Domain**.
+1. Railway → **New Project → Deploy from GitHub repo** → `zadar_gtfs`.
+2. **Settings → Build**: builder `Railpack`. **Settings → Deploy**: start command `python realtime/server.py`, healthcheck path `/healthz`.
+3. **Variables**: `ZADAR_API_KEY`, `SIRI_VM_URL` (realtime vehicle monitoring endpoint), optionally `POLL_INTERVAL` (default 20 s).
+4. **Settings → Networking → Generate Domain**.
+
+`/healthz` only checks that the server is running; `/status` reports data freshness and source errors.
 
 ## License
 
