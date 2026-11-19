@@ -1,0 +1,42 @@
+name: Update GTFS Feed
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 02:20 UTC = 03:20 (zima) / 04:20 (léto) v Zadaru – stáhne jízdní řád na nový den
+    - cron: '20 2 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download today's data
+        env:
+          ZADAR_API_KEY: ${{ secrets.ZADAR_API_KEY }}
+        run: python fetch.py
+
+      - name: Build GTFS
+        run: python build_gtfs.py
+
+      - name: Commit and push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add -A data zadar_gtfs.zip
+          git diff --staged --quiet || (git commit -m "Automatická aktualizace GTFS dat" && git push)
