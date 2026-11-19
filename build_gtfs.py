@@ -3,9 +3,10 @@ Sestaví statický GTFS (zadar_gtfs.zip) z uložených denních snímků.
 
 Pro každý den v horizontu HORIZON_DAYS se vybere snímek:
   1. přesně ten den, pokud byl stažen,
-  2. jinak poslední stažený stejný den v týdnu (bez svátků),
-     u pracovních dnů případně libovolný poslední pracovní den,
-  3. svátky a neděle se berou z posledního snímku neděle/svátku.
+  2. pracovní dny: poslední stejný den v týdnu, jinak libovolný pracovní den,
+  3. soboty jen z poslední soboty, neděle jen z poslední neděle,
+  4. svátky z posledního svátku, jinak z poslední neděle.
+Snímky stažené ve svátek se pro běžné dny nepoužívají.
 Jízdy se slučují podle trip_id (identický vzor = stejný spoj), dny provozu
 jdou do calendar_dates.txt.
 """
@@ -45,7 +46,9 @@ def available_snapshots():
 
 
 def day_kind(d):
-    if zc.is_holiday(d) or d.weekday() == 6:
+    if zc.is_holiday(d):
+        return "holiday"
+    if d.weekday() == 6:
         return "sunday"
     if d.weekday() == 5:
         return "saturday"
@@ -65,10 +68,19 @@ def pick_snapshot(target, snaps):
         for d in past:
             if day_kind(d) == "weekday":
                 return d, "jiný pracovní den"
-    else:
+    elif kind in ("saturday", "sunday"):
+        # soboty jen ze sobot, neděle jen z nedělí (bez svátků)
         for d in past:
             if day_kind(d) == kind:
-                return d, "stejný typ dne"
+                return d, f"poslední {'sobota' if kind == 'saturday' else 'neděle'}"
+    else:
+        # svátek: poslední svátek, jinak poslední neděle
+        for d in past:
+            if day_kind(d) == "holiday":
+                return d, "poslední svátek"
+        for d in past:
+            if day_kind(d) == "sunday":
+                return d, "svátek podle neděle"
     return None, "chybí snímek tohoto typu dne"
 
 

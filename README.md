@@ -15,8 +15,11 @@ Automatically generated GTFS and GTFS-Realtime data for city, suburban and islan
 The source API (zadarcity.hr) only provides the timetable for the current day. A GitHub Action therefore downloads a snapshot every night (`data/timetables/YYYY-MM-DD.json.gz`) and the feed is assembled from the collected snapshots for the next 45 days:
 
 1. the exact day, if a snapshot exists,
-2. otherwise the latest snapshot of the same weekday (weekdays may fall back to any other weekday),
-3. Sundays and Croatian public holidays use the latest Sunday/holiday snapshot.
+2. weekdays: the latest snapshot of the same weekday, otherwise any other weekday,
+3. Saturdays only from the latest Saturday, Sundays only from the latest Sunday,
+4. Croatian public holidays from the latest holiday snapshot, otherwise from the latest Sunday.
+
+Snapshots taken on a public holiday are never used for regular days.
 
 Days without a suitable snapshot (e.g. the first weekend after setup) have no service in the feed until a matching snapshot is collected.
 
