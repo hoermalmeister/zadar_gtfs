@@ -16,6 +16,7 @@ RUN chmod +x /opt/motis/start.sh
 ENV DATA_DIR=/data \
     NAME=zadar \
     GTFS_URL=https://github.com/hoermalmeister/zadar_gtfs/raw/main/zadar_gtfs.zip \
-    OSM_URL=https://download.geofabrik.de/europe/croatia-latest.osm.pbf
+    OSM_URL=https://github.com/hoermalmeister/zadar_gtfs/releases/download/osm/region.osm.pbf \
+    CLIP=0
 
 CMD ["/opt/motis/start.sh"]

@@ -71,15 +71,18 @@ Then open http://localhost:8080. Everything is stored in `motis/work/` (ignored 
 
 ### MOTIS on Railway (web)
 
-`motis/Dockerfile` + `motis/start.sh` run MOTIS as a public web service. On start it downloads the Croatia extract, clips it to the area of the GTFS stops (keeps memory and disk low), imports the current GTFS and serves the web UI and API. Every 6 hours it checks for a new GTFS and re-imports only the timetable.
+`motis/Dockerfile` + `motis/start.sh` run MOTIS as a public web service. On start it downloads the map, imports the current GTFS and serves the web UI and API. Every 6 hours it checks for a new GTFS and re-imports only the timetable.
 
+Railway cannot reach download.geofabrik.de, so the map is prepared by the **Update OSM extract for MOTIS** workflow: it downloads the Croatia extract, clips it to the area of the GTFS stops and publishes it as the release asset `osm/region.osm.pbf` (monthly).
+
+0. **Actions → Update OSM extract for MOTIS → Run workflow** once before the first deploy.
 1. In the same Railway project: **+ New → GitHub Repo → `zadar_gtfs`** (a second service next to the realtime one).
 2. **Variables**: `RAILWAY_DOCKERFILE_PATH` = `/motis/Dockerfile`, `PORT` = `8080`, optionally `RT_URL` = `https://<realtime-domain>/trip_updates.pb`.
 3. **Volume**: attach a volume mounted at `/data` (map and import survive redeploys).
 4. **Settings**: no healthcheck (the first import takes a few minutes); Watch Paths `/motis/**` so daily data commits do not rebuild the image.
 5. **Networking → Generate Domain** (port 8080).
 
-Optional variables: `REFRESH_HOURS` (6), `CLIP` (1), `CLIP_MARGIN` (0.15°), `OSM_MAX_AGE_DAYS` (30).
+Optional variables: `REFRESH_HOURS` (6), `OSM_MAX_AGE_DAYS` (30), `OSM_URL` (another map source; set `CLIP=1` to clip it on start).
 
 ## License
 

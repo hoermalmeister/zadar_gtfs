@@ -1,0 +1,45 @@
+name: Update OSM extract for MOTIS
+
+# Railway cannot reach download.geofabrik.de, so the map is prepared here,
+# clipped to the area of the GTFS stops and published as a release asset
+# (tag "osm", file region.osm.pbf), which motis/start.sh downloads.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '40 3 1 * *'   # monthly
+
+permissions:
+  contents: write
+
+jobs:
+  osm:
+    runs-on: ubuntu-latest
+    env:
+      OSM_SOURCE: https://download.geofabrik.de/europe/croatia-latest.osm.pbf
+      CLIP_MARGIN: '0.15'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install osmium
+        run: sudo apt-get update && sudo apt-get install -y osmium-tool
+
+      - name: Download and clip map
+        run: |
+          curl -fSL --retry 3 -o source.osm.pbf "$OSM_SOURCE"
+          BBOX=$(python3 - zadar_gtfs.zip "$CLIP_MARGIN" <<'PY'
+          import csv, io, sys, zipfile
+          z = zipfile.ZipFile(sys.argv[1]); m = float(sys.argv[2])
+          rows = list(csv.DictReader(io.TextIOWrapper(z.open("stops.txt"), encoding="utf-8-sig")))
+          lat = [float(r["stop_lat"]) for r in rows]; lon = [float(r["stop_lon"]) for r in rows]
+          print(f"{min(lon)-m:.5f},{min(lat)-m:.5f},{max(lon)+m:.5f},{max(lat)+m:.5f}")
+          PY
+          )
+          echo "Clipping to $BBOX"
+          osmium extract --overwrite -s smart -b "$BBOX" -o region.osm.pbf source.osm.pbf
+          ls -lh source.osm.pbf region.osm.pbf
+
+      - name: Publish release asset
+        run: |
+          gh release view osm >/dev/null 2>&1 || gh release create osm --title "OSM extract for MOTIS" --notes "Clipped OpenStreetMap extract (© OpenStreetMap contributors, ODbL), updated monthly by GitHub Actions."
+          gh release upload osm region.osm.pbf --clobber

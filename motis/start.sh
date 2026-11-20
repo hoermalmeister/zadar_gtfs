@@ -128,7 +128,8 @@ stop_server() {
 }
 trap 'stop_server; exit 0' TERM INT
 
-fetch_gtfs || true
+if fetch_gtfs; then log "GTFS downloaded"; else log "GTFS unchanged or download failed"; fi
+[ -f "$GTFS" ] || { log "no GTFS available"; exit 1; }
 prepare_osm
 write_config
 run_import
