@@ -25,7 +25,7 @@ Days without a suitable snapshot (e.g. the first weekend after setup) have no se
 
 - `fetch.py` – downloads stops and today's timetable (needs `ZADAR_API_KEY`)
 - `build_gtfs.py` – builds `zadar_gtfs.zip` from the stored snapshots
-- `zadar_common.py` – shared parsing and `trip_id` logic (static and realtime use identical IDs)
+- `zadar_common.py` – shared parsing and `trip_id` logic (static and realtime use identical IDs). `trip_id` = line + variant + first departure + first stop (e.g. `3_4_0915_1545`) and stays the same every day, so realtime matches even an older copy of the static feed.
 - `realtime/` – GTFS-RT server (SIRI StopMonitoring → GTFS-RT), deployed on Railway
 
 ## Setup

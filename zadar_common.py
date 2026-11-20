@@ -6,7 +6,6 @@ GTFS-RT neodkazoval na existující spoje. Proto je celá logika tady.
 """
 
 import gzip
-import hashlib
 import json
 import os
 from collections import defaultdict
@@ -141,27 +140,25 @@ def parse_snapshot(siri, stops):
     return service_date, journeys, dropped
 
 
-def pattern_key(jny):
-    parts = [jny["line_ref"], jny["direction"]]
-    parts += [f"{s}@{a}/{d}" for s, a, d, _o in jny["calls"]]
-    return "|".join(parts)
-
-
 def assign_trip_ids(journeys):
     """
-    trip_id = linka + hash(vzor jízdy). Identické jízdy (stejná linka a časy,
-    např. posilové spoje) se rozliší pořadím podle VehicleJourneyRef, takže
-    výsledek nezávisí na pořadí v odpovědi API.
+    Stabilní trip_id napříč dny: linka + směr + výchozí zastávka + čas odjezdu
+    z výchozí zastávky (ten je v jízdním řádu pevný, na celé minuty; mezilehlé
+    časy se den ode dne mění o sekundy až minuty, proto do ID nevstupují).
+    Příklad: 3_4_0915_1545. Jízdy se stejným začátkem se rozliší pořadím
+    podle struktury (počet a sled zastávek), pak podle VehicleJourneyRef.
     """
     groups = defaultdict(list)
     for j in journeys:
-        j["key"] = pattern_key(j)
+        first_stop, _a, first_dep, _o = j["calls"][0]
+        j["key"] = (j["line_ref"], j["direction"], first_stop, first_dep)
         groups[j["key"]].append(j)
-    for key, items in groups.items():
-        items.sort(key=lambda j: j["vj_ref"])
+    for (line_ref, _direction, first_stop, first_dep), items in groups.items():
+        items.sort(key=lambda j: (len(j["calls"]), tuple(c[0] for c in j["calls"]), j["vj_ref"]))
+        hhmm = f"{first_dep // 3600:02d}{(first_dep % 3600) // 60:02d}"
         for occ, j in enumerate(items):
-            digest = hashlib.sha1(f"{key}#{occ}".encode("utf-8")).hexdigest()[:10]
-            j["trip_id"] = f"{safe_id(j['short_name'])}_{j['line_ref']}_{digest}"
+            suffix = f"_{occ + 1}" if occ else ""
+            j["trip_id"] = f"{safe_id(j['short_name'])}_{line_ref}_{hhmm}_{first_stop}{suffix}"
 
 
 def safe_id(txt):
