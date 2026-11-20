@@ -4,7 +4,7 @@
 # 1. downloads the OSM extract and clips it to the area of the GTFS stops,
 # 2. downloads the current GTFS from GitHub,
 # 3. imports and starts the MOTIS server (web UI + API on $PORT),
-# 4. every REFRESH_HOURS checks for a new GTFS; if it changed, re-imports
+# 4. every REFRESH_HOURS (default 1) checks for a new GTFS; if it changed, re-imports
 #    (only the timetable step is recomputed) and restarts the server.
 #
 # Environment:
@@ -15,7 +15,7 @@
 #   DATA_DIR        persistent storage (default: /data – mount a volume here)
 #   CLIP            1 = clip the map to the GTFS stops bounding box (default 1)
 #   CLIP_MARGIN     margin around the stops in degrees (default 0.15)
-#   REFRESH_HOURS   how often to check for a new GTFS (default 6)
+#   REFRESH_HOURS   how often to check for a new GTFS (default 1)
 #   OSM_MAX_AGE_DAYS  re-download the map after this many days (default 30)
 #   PORT            set by Railway
 set -euo pipefail
@@ -27,7 +27,7 @@ RT_URL="${RT_URL:-}"
 DATA_DIR="${DATA_DIR:-/data}"
 CLIP="${CLIP:-1}"
 CLIP_MARGIN="${CLIP_MARGIN:-0.15}"
-REFRESH_HOURS="${REFRESH_HOURS:-6}"
+REFRESH_HOURS="${REFRESH_HOURS:-1}"
 OSM_MAX_AGE_DAYS="${OSM_MAX_AGE_DAYS:-30}"
 PORT="${PORT:-8080}"
 MOTIS_HOME="${MOTIS_HOME:-$(cd "$(dirname "$0")" && pwd)}"
@@ -109,8 +109,20 @@ EOF
   } > "$DATA_DIR/config.yml"
 }
 
+gtfs_info() {   # feed_version + sample trip_id, so the log shows which feed is loaded
+  python3 - "$GTFS" <<'PY2' || true
+import csv, io, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+def first(name):
+    with z.open(name) as fh:
+        return next(csv.DictReader(io.TextIOWrapper(fh, encoding="utf-8-sig")), {})
+v = first("feed_info.txt").get("feed_version", "?") if "feed_info.txt" in z.namelist() else "?"
+print(f"feed_version={v} sample_trip_id={first('trips.txt').get('trip_id', '?')}")
+PY2
+}
+
 run_import() {
-  log "import"
+  log "import GTFS $(gtfs_info)"
   ./motis import -c "$DATA_DIR/config.yml" -d "$DATA_DIR/data"
 }
 
