@@ -1,14 +1,14 @@
 """
 GTFS-Realtime server pro Zadar (Liburnija) – nasazení na Railway.
 
-  * každých POLL_INTERVAL s stáhne polohy (SIRI VehicleMonitoring z SIRI_VM_URL),
+  * každých POLL_INTERVAL s stáhne odjezdy celé sítě (SIRI StopMonitoring),
   * každých TIMETABLE_REFRESH_MIN min obnoví dnešní jízdní řád kvůli párování,
   * servíruje /vehicle_positions.pb, /trip_updates.pb (+ .json na ladění).
 
 Proměnné prostředí:
   ZADAR_API_KEY          API klíč (povinné)
-  SIRI_VM_URL            URL realtime endpointu se SIRI VehicleMonitoring
-  POLL_INTERVAL          s mezi dotazy na polohy (výchozí 20)
+  SIRI_SM_URL            URL realtime endpointu (výchozí /LitTrasnit/stop/announcement/nodeundefined)
+  POLL_INTERVAL          s mezi dotazy na realtime (výchozí 30)
   TIMETABLE_REFRESH_MIN  min mezi obnovou jízdního řádu (výchozí 15)
 """
 
@@ -26,15 +26,17 @@ import zadar_rt as rt  # noqa: E402
 zc = rt.zc
 
 PORT = int(os.environ.get("PORT", "8080"))
-POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "20"))
+POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
 TIMETABLE_REFRESH_MIN = int(os.environ.get("TIMETABLE_REFRESH_MIN", "15"))
-SIRI_VM_URL = os.environ.get("SIRI_VM_URL", "").strip()
+SIRI_SM_URL = (os.environ.get("SIRI_SM_URL", "").strip()
+               or f"{zc.API_BASE}/LitTrasnit/stop/announcement/nodeundefined")
 
 app = Flask(__name__)
 _lock = threading.Lock()
 _state = {"index": None, "index_at": 0.0, "stops": None,
           "vp_pb": rt.new_feed().SerializeToString(), "tu_pb": rt.new_feed().SerializeToString(),
-          "vp_dict": {}, "tu_dict": {}, "last_poll_at": 0.0, "stats": {}, "error": None}
+          "vp_dict": {}, "tu_dict": {}, "last_poll_at": 0.0, "stats": {}, "error": None,
+          "last_positions": {}}
 
 
 def refresh_index():
@@ -51,10 +53,8 @@ def refresh_index():
 
 def poll_once():
     refresh_index()
-    if not SIRI_VM_URL:
-        raise RuntimeError("Není nastavena proměnná SIRI_VM_URL – realtime zdroj chybí.")
-    siri = zc.fetch_json(SIRI_VM_URL, timeout=60)
-    vp, tu, stats = rt.build_feeds(siri, _state["index"])
+    siri = zc.fetch_json(SIRI_SM_URL, timeout=60)
+    vp, tu, stats = rt.build_feeds(siri, _state["index"], _state["last_positions"])
     with _lock:
         _state.update(vp_pb=vp.SerializeToString(), tu_pb=tu.SerializeToString(),
                       vp_dict=MessageToDict(vp), tu_dict=MessageToDict(tu),
@@ -115,7 +115,7 @@ def status():
         stats = _state["stats"]
     ok = age is not None and age < POLL_INTERVAL * 3 and err is None
     return (jsonify({"ok": ok, "age_s": age, "error": err, "stats": stats,
-                     "siri_vm_configured": bool(SIRI_VM_URL)}), 200 if ok else 503)
+                     "source": SIRI_SM_URL}), 200 if ok else 503)
 
 
 @app.route("/")

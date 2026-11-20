@@ -150,7 +150,7 @@ def main():
         long_name = name[len(short):].strip(" -") if name.startswith(short) else name
         route_rows.append([route_id(short), AGENCY["agency_id"], short, long_name, 3])
 
-    used_stops = {s for j in trips.values() for s, _, _ in j["calls"]}
+    used_stops = {c[0] for j in trips.values() for c in j["calls"]}
     stop_rows = []
     for sid in sorted(used_stops):
         s = stops[sid]
@@ -163,7 +163,7 @@ def main():
         sid = services[frozenset(trip_dates[tid])]
         headsign = j["direction"] or j["line_name"]
         trip_rows.append([route_id(j["short_name"]), sid, tid, headsign])
-        for seq, (stop_id, a, d) in enumerate(j["calls"], 1):
+        for stop_id, a, d, seq in j["calls"]:
             st_rows.append([tid, zc.fmt_time(a), zc.fmt_time(d), stop_id, seq])
 
     cd_rows = []

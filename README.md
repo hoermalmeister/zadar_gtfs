@@ -26,7 +26,7 @@ Days without a suitable snapshot (e.g. the first weekend after setup) have no se
 - `fetch.py` – downloads stops and today's timetable (needs `ZADAR_API_KEY`)
 - `build_gtfs.py` – builds `zadar_gtfs.zip` from the stored snapshots
 - `zadar_common.py` – shared parsing and `trip_id` logic (static and realtime use identical IDs)
-- `realtime/` – GTFS-RT server (SIRI VehicleMonitoring → GTFS-RT), deployed on Railway
+- `realtime/` – GTFS-RT server (SIRI StopMonitoring → GTFS-RT), deployed on Railway
 
 ## Setup
 
@@ -37,10 +37,19 @@ Days without a suitable snapshot (e.g. the first weekend after setup) have no se
 
 1. Railway → **New Project → Deploy from GitHub repo** → `zadar_gtfs`.
 2. **Settings → Build**: builder `Railpack`. **Settings → Deploy**: start command `python realtime/server.py`, healthcheck path `/healthz`.
-3. **Variables**: `ZADAR_API_KEY`, `SIRI_VM_URL` (realtime vehicle monitoring endpoint), optionally `POLL_INTERVAL` (default 20 s).
+3. **Variables**: `ZADAR_API_KEY`, optionally `POLL_INTERVAL` (default 30 s) and `SIRI_SM_URL` (default `/LitTrasnit/stop/announcement/nodeundefined`).
 4. **Settings → Networking → Generate Domain**.
 
 `/healthz` only checks that the server is running; `/status` reports data freshness and source errors.
+
+### What the realtime feed contains
+
+The source is SIRI StopMonitoring for the whole network (departures in the next ~45 minutes). Only some vehicles are actively tracked (`Monitored`), so:
+
+- **Vehicle Positions** – vehicles that report a GPS position (plate number as vehicle id, next stop, bearing computed from consecutive positions),
+- **Trip Updates** – tracked trips and trips whose predicted times differ from the schedule; expected arrival/departure for the upcoming stops.
+
+Trips are matched to the static feed via today's timetable (`VehicleJourneyRef`), with a fallback on line + stop order + stop + scheduled time (±3 min).
 
 ## License
 

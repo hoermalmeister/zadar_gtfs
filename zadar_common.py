@@ -95,14 +95,15 @@ def parse_snapshot(siri, stops):
     """
     Vrátí (service_date, journeys, dropped_stop_ids).
     journey = {line_ref, line_name, short_name, direction, vj_ref,
-               calls: [(stop_id, arr_s, dep_s)], key, trip_id}
+               calls: [(stop_id, arr_s, dep_s, order)], raw_keys, key, trip_id}
+    order = pořadí zastávky ve zdrojové jízdě (1-based) = SIRI Order = GTFS stop_sequence
     """
     service_date = snapshot_service_date(siri)
     journeys, dropped = [], set()
 
     for raw in iter_raw_journeys(siri):
-        calls = []
-        for c in raw["calls"]:
+        calls, raw_keys = [], []
+        for order, c in enumerate(raw["calls"], 1):
             ref = c.get("StopPointRef", "")
             try:
                 stop_id = int(ref.split("/")[-1])
@@ -117,22 +118,24 @@ def parse_snapshot(siri, stops):
                 continue
             arr_s = _secs_since(service_date, arr or dep)
             dep_s = _secs_since(service_date, dep or arr)
+            # klíč pro párování realtime (pořadí, zastávka, plánované časy před úpravami)
+            raw_keys.append((order, stop_id, arr_s, dep_s))
             if dep_s < arr_s:          # pevný odjezd časového bodu dřív než modelový příjezd
                 arr_s = dep_s
-            calls.append((stop_id, arr_s, dep_s))
+            calls.append((stop_id, arr_s, dep_s, order))
 
         # časy musí být neklesající i mezi zastávkami
         fixed, last = [], -1
-        for stop_id, a, d in calls:
+        for stop_id, a, d, order in calls:
             a = max(a, last)
             d = max(d, a)
-            fixed.append((stop_id, a, d))
+            fixed.append((stop_id, a, d, order))
             last = d
         if len(fixed) < 2:
             continue
 
         short = raw["line_name"].split()[0] if raw["line_name"] else raw["line_ref"]
-        journeys.append({**raw, "short_name": short, "calls": fixed})
+        journeys.append({**raw, "short_name": short, "calls": fixed, "raw_keys": raw_keys})
 
     assign_trip_ids(journeys)
     return service_date, journeys, dropped
@@ -140,7 +143,7 @@ def parse_snapshot(siri, stops):
 
 def pattern_key(jny):
     parts = [jny["line_ref"], jny["direction"]]
-    parts += [f"{s}@{a}/{d}" for s, a, d in jny["calls"]]
+    parts += [f"{s}@{a}/{d}" for s, a, d, _o in jny["calls"]]
     return "|".join(parts)
 
 
