@@ -51,6 +51,24 @@ The source is SIRI StopMonitoring for the whole network (departures in the next 
 
 Trips are matched to the static feed via today's timetable (`VehicleJourneyRef`), with a fallback on line + stop order + stop + scheduled time (±3 min).
 
+## Local test with MOTIS
+
+`motis/` contains a script that runs a local [MOTIS 2](https://github.com/motis-project/motis) routing server on this feed: it downloads MOTIS, the OpenStreetMap extract from Geofabrik and the current `zadar_gtfs.zip`, writes `config.yml` and starts the server.
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File motis\run.ps1
+powershell -ExecutionPolicy Bypass -File motis\run.ps1 -RtUrl https://<railway-domain>/trip_updates.pb
+```
+
+```bash
+# Linux / macOS
+./motis/run.sh
+RT_URL=https://<railway-domain>/trip_updates.pb ./motis/run.sh
+```
+
+Then open http://localhost:8080. Everything is stored in `motis/work/` (ignored by git). The first import of the Croatia extract takes a while; later runs only redo the steps whose inputs changed. MOTIS uses GTFS-RT **Trip Updates** only (vehicle positions are ignored), so pass the `trip_updates.pb` URL.
+
 ## License
 
 This data is provided under the **CC BY-NC-ND 4.0** license.

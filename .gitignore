@@ -3,3 +3,4 @@ __pycache__/
 *.pb
 vehicle_positions.json
 trip_updates.json
+motis/work/
