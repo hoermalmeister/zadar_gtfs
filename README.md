@@ -51,39 +51,6 @@ The source is SIRI StopMonitoring for the whole network (departures in the next 
 
 Trips are matched to the static feed via today's timetable (`VehicleJourneyRef`), with a fallback on line + stop order + stop + scheduled time (±3 min).
 
-## Local test with MOTIS
-
-`motis/` contains a script that runs a local [MOTIS 2](https://github.com/motis-project/motis) routing server on this feed: it downloads MOTIS, the OpenStreetMap extract from Geofabrik and the current `zadar_gtfs.zip`, writes `config.yml` and starts the server.
-
-```powershell
-# Windows
-powershell -ExecutionPolicy Bypass -File motis\run.ps1
-powershell -ExecutionPolicy Bypass -File motis\run.ps1 -RtUrl https://<railway-domain>/trip_updates.pb
-```
-
-```bash
-# Linux / macOS
-./motis/run.sh
-RT_URL=https://<railway-domain>/trip_updates.pb ./motis/run.sh
-```
-
-Then open http://localhost:8080. Everything is stored in `motis/work/` (ignored by git). The first import of the Croatia extract takes a while; later runs only redo the steps whose inputs changed. MOTIS uses GTFS-RT **Trip Updates** only (vehicle positions are ignored), so pass the `trip_updates.pb` URL.
-
-### MOTIS on Railway (web)
-
-`motis/Dockerfile` + `motis/start.sh` run MOTIS as a public web service. On start it downloads the map, imports the current GTFS and serves the web UI and API. Every hour it checks for a new GTFS and re-imports only the timetable; the log line `import GTFS feed_version=… sample_trip_id=…` shows which feed is loaded.
-
-Railway cannot reach download.geofabrik.de, so the map is prepared by the **Update OSM extract for MOTIS** workflow: it downloads the Croatia extract, clips it to the area of the GTFS stops and publishes it as the release asset `osm/region.osm.pbf` (monthly).
-
-0. **Actions → Update OSM extract for MOTIS → Run workflow** once before the first deploy.
-1. In the same Railway project: **+ New → GitHub Repo → `zadar_gtfs`** (a second service next to the realtime one).
-2. **Variables**: `RAILWAY_DOCKERFILE_PATH` = `/motis/Dockerfile`, `PORT` = `8080`, optionally `RT_URL` = `https://<realtime-domain>/trip_updates.pb`.
-3. **Volume**: attach a volume mounted at `/data` (map and import survive redeploys).
-4. **Settings**: no healthcheck (the first import takes a few minutes); Watch Paths `/motis/**` so daily data commits do not rebuild the image.
-5. **Networking → Generate Domain** (port 8080).
-
-Optional variables: `REFRESH_HOURS` (1), `OSM_MAX_AGE_DAYS` (30), `OSM_URL` (another map source; set `CLIP=1` to clip it on start).
-
 ## License
 
 This data is provided under the **CC BY-NC-ND 4.0** license.
